@@ -9,8 +9,13 @@
 import UIKit
 import AVFoundation
 
-class RecordViewController: UIViewController, AVAudioRecorderDelegate {
+enum RecordingState {
+   case  recording
+  case notRecording
+}
 
+class RecordViewController: UIViewController, AVAudioRecorderDelegate {
+    
     
     @IBOutlet weak var recordButton: UIButton!
     @IBOutlet weak var tapToRecord: UILabel!
@@ -18,37 +23,63 @@ class RecordViewController: UIViewController, AVAudioRecorderDelegate {
     
     var audioRecorder: AVAudioRecorder!
     
+    override func viewWillAppear(_ animated: Bool) {
+        
+        configureUI(.notRecording)
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         // Do any additional setup after loading the view.
-        stopRecordingButton.isEnabled = false
-        
     }
-
+    
     @IBAction func recordAudio(_ sender: Any) {
-        tapToRecord.text = "Recording in Progress..."
-        stopRecordingButton.isEnabled = true
-        recordButton.isEnabled = false
         
+        configureUI(.recording)
         let searchURL = RecordViewModel().recordAudioURL()
         let session = AVAudioSession.sharedInstance()
-            try! session.setCategory(AVAudioSession.Category.playAndRecord, mode: AVAudioSession.Mode.default, options: AVAudioSession.CategoryOptions.defaultToSpeaker)
-
-            try! audioRecorder = AVAudioRecorder(url: searchURL as URL, settings: [:])
-            audioRecorder.delegate = self
-            audioRecorder.isMeteringEnabled = true
-            audioRecorder.prepareToRecord()
-            audioRecorder.record()
+        
+        do {
+            let session: () = try session.setCategory(AVAudioSession.Category.playAndRecord, mode: AVAudioSession.Mode.default, options: AVAudioSession.CategoryOptions.defaultToSpeaker)
+            print(session)
+        } catch {
+            print("session not started")
+        }
+        
+        try! audioRecorder = AVAudioRecorder(url: searchURL as URL, settings: [:])
+        audioRecorder.delegate = self
+        audioRecorder.isMeteringEnabled = true
+        audioRecorder.prepareToRecord()
+        audioRecorder.record()
     }
     
     @IBAction func stopRecording(_ sender: Any) {
-        tapToRecord.text = "Tap to Record"
-        stopRecordingButton.isEnabled = true
-        recordButton.isEnabled = true
         
+        configureUI(.notRecording)
         audioRecorder.stop()
         let audioSession = AVAudioSession.sharedInstance()
-        try! audioSession.setActive(false)
+        do {
+            let session: () = try audioSession.setActive(false)
+                  print(session)
+        } catch {
+            print("session not active")
+        }
+        
+    }
+    
+    func  configureUI(_ recordingState: RecordingState) {
+        switch recordingState {
+        case .recording:
+            // Update the UI to reflect recording state
+            tapToRecord.text = "Recording in Progress..."
+            stopRecordingButton.isEnabled = true
+            recordButton.isEnabled = false
+        case .notRecording:
+            // Update the UI to reflect not recording state
+            tapToRecord.text = "Tap to Record"
+            stopRecordingButton.isEnabled = false
+            recordButton.isEnabled = true
+        }
     }
     
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
@@ -61,8 +92,16 @@ class RecordViewController: UIViewController, AVAudioRecorderDelegate {
     
     func audioRecorderDidFinishRecording(_ recorder: AVAudioRecorder, successfully flag: Bool) {
         if flag {
-             performSegue(withIdentifier: "StopRecording", sender: audioRecorder.url)
-         }
+            performSegue(withIdentifier: "StopRecording", sender: audioRecorder.url)
+        } else {
+            let alert = UIAlertController(title: "Pitch Perfect!", message: "Failed to save Audio. Please retry after sometime..", preferredStyle: UIAlertController.Style.alert)
+
+            // add the actions (buttons)
+            alert.addAction(UIAlertAction(title: "Ok", style: UIAlertAction.Style.default, handler: nil))
+
+            // show the alert
+            self.present(alert, animated: true, completion: nil)
+        }
     }
 }
 
